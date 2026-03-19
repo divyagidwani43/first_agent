@@ -77,12 +77,47 @@ def _looks_like_task(text: str) -> bool:
     return bool(_ACTION_WORDS.search(text))
 
 
+# Keywords that make weather-vs-time intent unambiguous
+_WEATHER_KW = re.compile(r"\b(weather|forecast|temperature|temp|climate|hot|cold|warm|raining|sunny)\b", re.I)
+_TIME_KW    = re.compile(r"\b(time|clock|what time|current time|date|day|hour|timezone)\b", re.I)
+
+# Per-session conversation context (single-user local server — module-level is fine)
+_context: dict = {
+    "pending_city": None,      # city waiting for weather-vs-time disambiguation
+    "last_city_intent": None,  # "weather" | "time" — remembered for subsequent city queries
+}
+
+
+def _is_ambiguous_location(text: str) -> bool:
+    """True if text looks like just a place name — no explicit weather or time keywords."""
+    words = text.strip().split()
+    return (
+        1 <= len(words) <= 3
+        and _is_only_letters(text)
+        and not _WEATHER_KW.search(text)
+        and not _TIME_KW.search(text)
+    )
+
+
 # ---------------------------------------------------------------------------
 # Button helper
 # ---------------------------------------------------------------------------
 
 def _with_buttons(reply: str, buttons: list[dict]) -> dict:
     return {"reply": reply, "buttons": buttons}
+
+
+def _ask_city_intent(city: str) -> dict:
+    """Return a disambiguation question when a city name could mean weather or time."""
+    _context["pending_city"] = city
+    return _with_buttons(
+        f"What would you like to know about {city}?",
+        [
+            {"label": "🌤 Weather",      "value": f"__city_weather__:{city}"},
+            {"label": "🕐 Time",         "value": f"__city_time__:{city}"},
+            {"label": "📝 Save as note", "value": f"__city_notes__:{city}"},
+        ],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -128,6 +163,46 @@ def agent_handle(text: str) -> ResponseType:
         return f'✅ Got it! I\'ll now recognize "{original}" as {label}. Thanks for teaching me! 🎓'
 
     # ------------------------------------------------------------------ #
+    # STEP 0c — City disambiguation button responses                      #
+    # ------------------------------------------------------------------ #
+    if text.startswith("__city_weather__:"):
+        city = text[len("__city_weather__:"):].strip()
+        _context["last_city_intent"] = "weather"
+        _context["pending_city"] = None
+        return get_weather(city)
+
+    if text.startswith("__city_time__:"):
+        city = text[len("__city_time__:"):].strip()
+        _context["last_city_intent"] = "time"
+        _context["pending_city"] = None
+        return handle_time(city)
+
+    if text.startswith("__city_notes__:"):
+        city = text[len("__city_notes__:"):].strip()
+        _context["pending_city"] = None
+        return add_note(city)
+
+    # ------------------------------------------------------------------ #
+    # STEP 0d — Pending city: user typed "weather" / "time" as follow-up  #
+    # ------------------------------------------------------------------ #
+    if _context["pending_city"]:
+        low = text.lower().strip()
+        if _WEATHER_KW.search(low):
+            city = _context["pending_city"]
+            _context["last_city_intent"] = "weather"
+            _context["pending_city"] = None
+            return get_weather(city)
+        if _TIME_KW.search(low):
+            city = _context["pending_city"]
+            _context["last_city_intent"] = "time"
+            _context["pending_city"] = None
+            return handle_time(city)
+        if re.search(r"\b(note|notes|save|remind)\b", low, re.I):
+            city = _context["pending_city"]
+            _context["pending_city"] = None
+            return add_note(city)
+
+    # ------------------------------------------------------------------ #
     # STEP 1 — Rule-based: math is unambiguous                            #
     # ------------------------------------------------------------------ #
     if _is_math(text):
@@ -144,12 +219,27 @@ def agent_handle(text: str) -> ResponseType:
 
     if intent == "weather" and confidence > 0.40:
         city = extract_city(text) or text.strip()
+        if _is_ambiguous_location(text):
+            if _context["last_city_intent"] == "weather":
+                return get_weather(city)
+            if _context["last_city_intent"] == "time":
+                return handle_time(city)
+            return _ask_city_intent(city)
+        _context["last_city_intent"] = "weather"
         return get_weather(city)
 
     if intent == "calculator" and confidence > 0.40:
         return calculate(text)
 
     if intent == "time" and confidence > 0.40:
+        if _is_ambiguous_location(text):
+            city = extract_city(text) or text.strip()
+            if _context["last_city_intent"] == "weather":
+                return get_weather(city)
+            if _context["last_city_intent"] == "time":
+                return handle_time(city)
+            return _ask_city_intent(city)
+        _context["last_city_intent"] = "time"
         return handle_time(text)
 
     if intent == "notes" and confidence > 0.40:
@@ -176,7 +266,12 @@ def agent_handle(text: str) -> ResponseType:
 
     # Text is only letters and low confidence → likely a city name
     if _is_only_letters(text) and confidence < 0.55:
-        return get_weather(text.strip())
+        city = text.strip()
+        if _context["last_city_intent"] == "weather":
+            return get_weather(city)
+        if _context["last_city_intent"] == "time":
+            return handle_time(city)
+        return _ask_city_intent(city)
 
     return f"I'm not sure about that.\n\n{HELP}"
 

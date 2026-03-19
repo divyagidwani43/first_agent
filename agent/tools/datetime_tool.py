@@ -152,8 +152,8 @@ def get_date_info(text: str) -> str:
 
 def extract_city_for_time(text: str) -> str | None:
     patterns = [
-        r"time\s+(?:in|at|for)\s+([a-zA-Z ]+?)(?:\?|$|\.)",
-        r"(?:what(?:'s|\s+is)?(?:\s+the)?|current)\s+time\s+(?:in|at|for)\s+([a-zA-Z ]+?)(?:\?|$|\.)",
+        r"time\s+(?:in|at|for|n)\s+([a-zA-Z ]+?)(?:\?|$|\.)",
+        r"(?:what(?:'s|\s+is)?(?:\s+the)?|current)\s+time\s+(?:in|at|for|n)\s+([a-zA-Z ]+?)(?:\?|$|\.)",
         r"what\s+(?:time|day|date)\s+is\s+it\s+in\s+([a-zA-Z ]+?)(?:\?|$|\.)",
         r"what\s+(?:time|day|date)\s+is\s+(?:it\s+)?in\s+([a-zA-Z ]+?)(?:\?|$|\.)",
         r"clock\s+(?:in|for|at)\s+([a-zA-Z ]+?)(?:\?|$|\.)",
