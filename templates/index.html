@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Local AI Agent</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <div class="chat-wrapper">
+
+    <div class="chat-header">
+      <div class="avatar">🤖</div>
+      <div class="info">
+        <h2>Local AI Agent</h2>
+        <p><span class="status-dot"></span>Online &mdash; Weather &middot; Calc &middot; Time &middot; Notes</p>
+      </div>
+    </div>
+
+    <div class="chat-messages" id="messages"></div>
+
+    <div class="chat-input">
+      <input
+        type="text"
+        id="userInput"
+        placeholder="Ask me anything..."
+        autocomplete="off"
+      />
+      <button id="sendBtn" title="Send">&#9658;</button>
+    </div>
+
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
