@@ -21,8 +21,11 @@ def chat():
     user_msg = data.get("message", "").strip()
     if not user_msg:
         return jsonify({"reply": "Please type something."})
-    reply = agent_handle(user_msg)
-    return jsonify({"reply": reply})
+    result = agent_handle(user_msg)
+    # Controller can return a plain string or a dict (with optional buttons)
+    if isinstance(result, str):
+        return jsonify({"reply": result})
+    return jsonify(result)
 
 
 if __name__ == "__main__":
